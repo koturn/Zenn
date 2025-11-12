@@ -64,7 +64,7 @@ uniform float3 _Scales;
 空間自体の伸縮であるため， `map()` への引数自体に `_Scales` の逆数を乗算している．
 
 しかし，それだけでは不十分で，レイの進行長に対しての拡大・縮小倍率の控除が必要となる．
-レイの方向ベクトル `rayDir` に対して `Scales` の逆数を乗算したものの長さの逆数を，1回のステップのレイの進行長 `d` に乗算することでこの控除が可能となる．
+レイの方向ベクトル `rayDir` に対して `Scales` の逆数を乗算したものの長さの逆数を，`map()` の結果に乗算することでこの控除が可能となる．
 
 長さの逆数をそのままコードに落とし込むと `1.0 / length(rayDir * rcpScales)` となるのだが，これは [`sqrt` 命令](thttps://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sqrt--sm4---asm- "sqrt (sm4 - asm) - Win32 apps | Microsoft Learn")と [`div` 命令](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/div--sm4---asm- "div (sm4 - asm) - Win32 apps | Microsoft Learn")になってしまう．
 世の中には[高速に逆平方根を計算するアルゴリズム](https://lipoyang.hatenablog.com/entry/2021/02/06/194619 "高速逆平方根 (fast inverse square root) のアルゴリズム解説 - 滴了庵日録")があり，DirectX11的にも [`rsq`](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/rsq--sm4---asm- "rsq (sm4 - asm) - Win32 apps | Microsoft Learn") という単一の命令がある．
@@ -1381,13 +1381,15 @@ half4 calcLightingUnity(half4 color, float3 worldPos, float3 worldNormal, half a
 
 [LTCGI](https://github.com/PiMaker/ltcgi/blob/v1.6.3/Shaders/LTCGI_Simple.shader "PiMaker/ltcgi")に対応するには[公式のサンプルコード](https://github.com/PiMaker/ltcgi/blob/v1.6.3/Shaders/LTCGI_Simple.shader "PiMaker/ltcgi Shaders/LTCGI_Simple.shader")を真似て，下記の対応を行うとよい．
 
-1. Tagsに `"LTCGI" = "_LTCGI"` のように，有効か無効かを格納するfloat型のuniform変数名を指定（この例はシェーダーに `uniform float _LTCGI` を宣言する例）<br>
-   あるいは，`"LTCGI" = "ALWAYS"` と指定し，常に実行時に判定を行わないことを明示．<br>
+1. `LTCGI_Contribution()` を用いてdiffuseとspecularを計算．
+2. 出力カラーに反映（diffuseは乗算，specularは加算）．
+3. （しなくてもよい処理）Tagsに `"LTCGI" = "_LTCGI"` のように，有効か無効かを格納するfloat型のuniform変数名を指定（この例はシェーダーに `uniform float _LTCGI` を宣言する例）<br>
+   あるいは，`"LTCGI" = "ALWAYS"` と指定し，実行時に判定を行わなず，常に有効であること明示．<br>
    どちらを用いるかの判断基準は下記の通り．
-    - `"LTCGI" = "変数名"`: LTCGIの処理コードをシェーダーに含め，実行時判定を行いたい場合．
-    - `"LTCGI" = "ALWAYS"`: LTCGIの処理コード自体をキーワード指定 (`#pragma shader_feature_local_fragment`) で含めないようにしたい場合．
-2. `LTCGI_Contribution()` を用いてdiffuseとspecularを計算．
-3. 出力カラーに反映（diffuseは乗算，specularは加算）．
+    - `"LTCGI" = "変数名"`: LTCGIの処理コードをシェーダーに含め，動的に判定を行いたい場合．
+    - `"LTCGI" = "ALWAYS"`: LTCGIの処理コード自体をキーワード指定 (`#pragma shader_feature_local_fragment`) で含めないようにしたい場合．<br>
+    このタグはLTCGIを組み込んだワールドプロジェクトにおけるエディタ (`LTCGI_Controller`) の処理対象であることをマークするためのものであるので，アバターに組み込むシェーダーとしては無くてもよい．<br>
+    しかし，ワールドで用いることが少しでも想定されるのであれば，記載しておく方がよいと思われる．
 
 LTCGIはv1とv2のAPIがあるが，本記事ではv1のAPIを利用する例を示す．
 
