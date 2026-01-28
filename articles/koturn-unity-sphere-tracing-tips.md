@@ -417,16 +417,32 @@ Multi Scale Volumetric Obscurance (MSVO) であれば問題は発生しないの
 ただし，GPU Instancingに対応させている場合，この指定は不要である．
 SPS-I対応を行っていることにより，GPUインスタンシングにも対応したコードとなっているので， `#pragma multi_compile_instancing` を記載し，インスペクタで有効にすれば，バッチングの問題は解消できる．
 
+Unity上で正しくバッチングに対応できているかどうかは，Sceneビューでは確認できず，Gameビューの表示を確認する必要がある．
+
 #### IgnoreProjector
 
 プロジェクタでの投影はマテリアルの差し替えによって行われる．
 しかし，レイマーチングは基本的にメッシュを無視して描画するものであるため，対策なしだと下敷きにしているメッシュの形状に沿って投影が行われてしまう．
 プロジェクタの投影を無効にするために `"IgnoreProjector" = "True"` を指定することをオススメする．
 
+下記表中のスクリーンショットはプロジェクタの投影を行っているときの `"IgnoreProjector" = "True"` の指定有無での比較画像となっている．
+`"IgnoreProjector" = "True"` が指定されていると，プロジェクタの影響を受けずにレイマーチングオブジェクトを描画できる．
+
+| IgnoreProject指定なし | IgnoreProjector指定あり |
+|-|-|
+| ![IgnoreProject指定なし](/images/koturn-unity-sphere-tracing-tips/IgnoreProjectorFalse.png) | ![IgnoreProjector指定あり](/images/koturn-unity-sphere-tracing-tips/IgnoreProjectorTrue.png) |
+
 #### VRCFallback
 
 レイマーチングは基本的にメッシュに沿わない描画を行うものなので，フォールバック可能なシェーダーはない．
 そのため， `"VRCFallback" = "Hidden"` を指定し，シェーダーブロックされている場合は非表示となるように設定しておくことをオススメする．
+
+下記表中のスクリーンショットはシェーダーブロックされた際の `"VRCFallback" = "Hidden"` の指定有無での比較画像となっている．
+`"VRCFallback" = "Hidden"` が指定されていなければ元のメッシュがそのまま表示されてしまう．
+
+| VRCFallback指定なし | `"VRCFallback" = "Hidden"` |
+|-|-|
+| ![VRCFallback指定なし](/images/koturn-unity-sphere-tracing-tips/VRCFallbackNoHidden.png) | !["VRCFallback" = "Hidden"](/images/koturn-unity-sphere-tracing-tips/VRCFallbackHidden.png) |
 
 ### フラグメントシェーダーでの深度出力
 
@@ -1936,7 +1952,7 @@ Unity 2021.2 からは特定のキーワードが有効時にシェーダーモ�
 しかし `[unroll]` はコンパイル時間と出力コードサイズを肥大化させるため，使用するにあたっては慎重に検討する方がよい．
 
 あまりに巨大なコードサイズのシェーダーになると，実行時の読み込みに時間を要することになるかもしれない．
-また，コンパイルに1分も要するとなると，開発においてもトライアル＆エラーを繰り返しにくくなる．
+また，例えばコンパイルに1分以上も要するとなると，開発中のトライアル＆エラーを繰り返しにくくなり，開発体験の低下に繋がる．
 
 ## 参考文献
 
