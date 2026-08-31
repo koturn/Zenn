@@ -67,7 +67,7 @@ uniform float3 _Scales;
 レイの方向ベクトル `rayDir` に対して `Scales` の逆数を乗算したものの長さの逆数を，`map()` の結果に乗算することでこの控除が可能となる．
 
 長さの逆数をそのままコードに落とし込むと `1.0 / length(rayDir * rcpScales)` となるのだが，これは [`sqrt` 命令](thttps://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sqrt--sm4---asm- "sqrt (sm4 - asm) - Win32 apps | Microsoft Learn")と [`div` 命令](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/div--sm4---asm- "div (sm4 - asm) - Win32 apps | Microsoft Learn")になってしまう．
-世の中には[高速に逆平方根を計算するアルゴリズム](https://lipoyang.hatenablog.com/entry/2021/02/06/194619 "高速逆平方根 (fast inverse square root) のアルゴリズム解説 - 滴了庵日録")があり，DirectX11的にも [`rsq`](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/rsq--sm4---asm- "rsq (sm4 - asm) - Win32 apps | Microsoft Learn") という単一の命令がある．
+世の中には[高速に逆平方根を計算するアルゴリズム](https://lipoyang.hatenablog.com/entry/2021/02/06/194619 "高速逆平方根 (fast inverse square root) のアルゴリズム解説 - 滴了庵日録")があり，DirectX11にも [`rsq`](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/rsq--sm4---asm- "rsq (sm4 - asm) - Win32 apps | Microsoft Learn") という単一の命令がある．
 ハードウェア的にもサポートされていると考えられるので，逆平方根の算出には組み込み関数 [`rsqrt()`](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-rsqrt "rsqrt - Win32 apps | Microsoft Learn") を用いる方がよい．
 
 これらを踏まえると，マーチングループ部分のコードは下記のようになる．
@@ -230,7 +230,7 @@ float3 calcNormal(float3 p)
 多くの例だとループを用いずに書かれているが，あえてループの形としたのは下記2点の理由による．
 
 - ループが行われるコードの方がコードサイズは小さく，コンパイル時間も短い
-- 手動でアンループされているコードからループするコードへのコンパイルはできないが，ループを用いたコードからアンロールしたコードへのコンパイルは `[unroll]` の指定により容易にできる
+- 手動でアンループされているシェーダーコードからループするコード生成はされない．逆にループを用いたシェーダーコードからアンロールしたコード生成は `[unroll]` の指定により容易にできる
 
 アンロールに関して，例えば下記2つのどちらも同じコード生成がされる．
 
@@ -270,13 +270,14 @@ float3 calcNormal(float3 p)
 }
 ```
 
-アンロールの指定がない場合，ループ内のコードが十分に小さければアンロールされる．
+アンロールの指定がない場合であっても，ループ内のコードが十分に小さければアンロールされる．
 例えば， `map()` が単純な球の距離関数であれば，無指定のfor文であってもアンロールされた結果となる．
 
 ### pragma target 3.0 と環境光
 
 [VRChatでどうしても レイマーチングをしたいあなたへ贈る本【Ver 1.1】](https://butadiene.booth.pm/items/1829988 "VRChatでどうしても レイマーチングをしたいあなたへ贈る本【Ver 1.1】")ではpragma targetの指定はなかったが，本記事のすべてのコードで `#pragma target 3.0` を指定している．
-これは[指定がなければ `#pragma target 2.5` が指定されているのと同様になる](https://docs.unity3d.com/2022.3/Documentation/Manual/SL-ShaderCompileTargets.html "Unity - Manual: Targeting shader models and GPU features in HLSL")が，これだと環境光を頂点単位で行う設定であるため， `ShaderSHPerPixel()` が何も行わなくなり，レイマーチングでのライティングに不都合なためである．
+[この指定がなければ `#pragma target 2.5` が指定されているのと同様になる](https://docs.unity3d.com/2022.3/Documentation/Manual/SL-ShaderCompileTargets.html "Unity - Manual: Targeting shader models and GPU features in HLSL")．
+しかし， `#pragma target 2.5` は環境光を頂点単位で行う設定であり， `ShaderSHPerPixel()` が何も行わなくなるため，レイマーチングで環境光を反映するのに不都合となる．
 
 下記はHalf-LambertとBlinn-Phongによるライティング関数だが， `ShadeSHPerPixel()` が機能しなければ描画結果が大きく異なる．
 
@@ -323,7 +324,7 @@ half4 calcLighting(half4 color, float3 worldPos, float3 worldNormal, half atten,
 環境光の処理があれば，Directional Lightが存在しない状況下でも明るさを確保できる．
 一方で，環境光の処理がなければ真っ黒な描画結果となってしまう．
 
-VRChatにはDirectional Lightが存在しないワールドもあるため，Directional Lightが存在しない状況は考慮すべきである．
+VRChatにはDirectional Lightが存在しないワールドもあるため，そういったワールドでも問題ないライティングとなるようにすべきである．
 
 | 環境光あり | 環境光なし |
 |:-:|:-:|
@@ -402,7 +403,8 @@ Tags
 #### RenderType
 
 Post Processing の Ambient Occlusion に Scalable Ambient Obscurance (SAO) を用いている場合，[下敷きにしているメッシュに沿って誤った影が描画](https://tips.hecomi.com/entry/2019/01/27/233137#%E3%83%95%E3%82%A9%E3%83%AF%E3%83%BC%E3%83%89%E3%81%A7-DepthNormalTexture-%E3%82%92%E4%BD%BF%E3%81%86%E5%A0%B4%E5%90%88 "Unity で距離関数の記述だけでレイマーチングができる uRaymarching を Forward / XR 対応した - 凹みTips")される．
-Multi Scale Volumetric Obscurance (MSVO) であれば問題は発生しないのだが，VRChatのようなプラットフォームにおけるアバターにレイマーチングのオブジェクトを仕込む場合，SAOが採用されているワールドに遭遇する可能性がある．
+Multi Scale Volumetric Obscurance (MSVO) であれば問題は発生しない．
+しかし，VRChatのようなプラットフォームにおいて，アバターにレイマーチングのオブジェクトを仕込む場合，SAOが採用されているワールドに遭遇する可能性がある．
 
 この問題を回避するには，下記2つのどちらかの手段を取るとよい．
 
@@ -411,11 +413,12 @@ Multi Scale Volumetric Obscurance (MSVO) であれば問題は発生しないの
 
 #### DisableBatching
 
-同じレイマーチングシェーダーのマテリアルを持つオブジェクトが2つ以上ある場合，バッチングが行われ，ローカル座標が取得できなくなる現象が発生する．
+同じレイマーチングシェーダーのマテリアルを持つオブジェクトが2つ以上ある場合，バッチングが行われてしまい，ローカル座標が取得できなくなる現象が発生する．
 これを防ぐために， `"DisableBatching" = "True"` を指定する．
 
 ただし，GPU Instancingに対応させている場合，この指定は不要である．
-SPS-I対応を行っていることにより，GPUインスタンシングにも対応したコードとなっているので， `#pragma multi_compile_instancing` を記載し，インスペクタで有効にすれば，バッチングの問題は解消できる．
+SPS-I対応を行っていることにより，GPU Instancingにも対応したシェーダーコードとなっている．
+そのため， `#pragma multi_compile_instancing` を記述し，インスペクタから有効（"Enable Instancing" にチェックを付ける）にすることでもバッチングの問題は解消できる．
 
 Unity上で正しくバッチングに対応できているかどうかは，Sceneビューでは確認できず，Gameビューの表示を確認する必要がある．
 
@@ -434,11 +437,13 @@ Unity上で正しくバッチングに対応できているかどうかは，Sce
 
 #### VRCFallback
 
+`VRCFallback` タグはVRChat向けのタグであり， [Shader Blocking and Fallback System](https://creators.vrchat.com/avatars/shader-fallback-system/ "Shader Blocking and Fallback System | VRChat Creation") でのフォールバック先のシェーダーの指定ができる．
+
 レイマーチングは基本的にメッシュに沿わない描画を行うものなので，フォールバック可能なシェーダーはない．
 そのため， `"VRCFallback" = "Hidden"` を指定し，シェーダーブロックされている場合は非表示となるように設定しておくことをオススメする．
 
 下記表中のスクリーンショットはシェーダーブロックされた際の `"VRCFallback" = "Hidden"` の指定有無での比較画像となっている．
-`"VRCFallback" = "Hidden"` が指定されていなければ元のメッシュがそのまま表示されてしまう．
+`"VRCFallback" = "Hidden"` が指定されていなければ元のメッシュがそのまま表示されてしまい不恰好である．
 
 | VRCFallback指定なし | `"VRCFallback" = "Hidden"` |
 |-|-|
@@ -488,7 +493,7 @@ float getDepth(float4 clipPos)
 }
 ```
 
-この判定には `HLSLSuport.cginc` で定義されている `UNITY_REVERSED_Z` を用いてもよい．
+この判定には `HLSLSuport.cginc` で定義されている `UNITY_REVERSED_Z` マクロを用いてもよい．
 
 ```hlsl
 float getDepth(float4 clipPos)
@@ -508,6 +513,14 @@ float getDepth(float4 clipPos)
 }
 ```
 
+この関数により，深度値は下記のようになる．
+依然としてDirectXとOpenGLで深度値の大小関係は逆であるが，0.0 ~ 1.0の範囲に値を収めることが要点であり，問題はない（こういうものと割り切ること）．
+
+| 種別 | Near | Far |
+|-|-|-|
+| DirectX | 1.0 | 0.0 |
+| OpenGL | 0.0 | 1.0 |
+
 ## 投影先オブジェクト
 
 ### Quad
@@ -517,8 +530,9 @@ UnityのデフォルトのQuadでも問題はない．
 
 ### Cube
 
-UnityのデフォルトキューブはUVや法線を考慮して24頂点12ポリゴンとなっているが，レイマーチングの投影を行うCubeとしてはUV，法線，接平面は必要ではないため8頂点12ポリゴンのキューブで十分であるし，頂点情報にUV，法線，接平面を含めなくてよい．
-（デフォルトキューブはそれぞれの面の法線を一様にするために24頂点必要となっている）
+UnityのデフォルトキューブはUVや法線を考慮して24頂点12ポリゴンとなっている（それぞれの面の法線を一様にするために24頂点必要）．
+しかし，レイマーチングの投影を行うCubeとしてはUV，法線，接平面は必要ではなく，8頂点12ポリゴンのキューブで十分である．
+すなわち，頂点情報にUV，法線，接平面を含めなくてもよい．
 
 スフィアトレーシングでレイの進行の反復回数が多くなるのは，レイがある程度描画オブジェクトに漸近しつつも結局は外れている場合である．
 Cubeの内側にのみオブジェクトを描画するという前提があるなら，描画オブジェクトを完全に被覆する必要最小限のサイズのCube（直方体でもよい）を用意すると多少の処理負荷の軽減につながると思われる．
@@ -569,7 +583,7 @@ Pass
 }
 ```
 
-ForwardAddパスでは `UNITY_PASS_FORWARDADD` マクロが定義されるが， `UNITY_SHOULD_SAMPLE_SH` の定義が下記の通りであるため，環境光がForwardBase分も含めて二重に計上されるわけではない．
+ForwardAddパスでは `UNITY_PASS_FORWARDADD` マクロが定義されるが， `UNITY_SHOULD_SAMPLE_SH` マクロの定義が下記の通りであるため，環境光がForwardBase分も含めて二重に計上されるわけではない．
 
 ```hlsl
 #define UNITY_SHOULD_SAMPLE_SH (defined(LIGHTPROBE_SH) && !defined(UNITY_PASS_FORWARDADD) && !defined(UNITY_PASS_PREPASSBASE) && !defined(UNITY_PASS_SHADOWCASTER) && !defined(UNITY_PASS_META))
@@ -1266,7 +1280,8 @@ _Lighting ("Lighting method", Int) = 2
 [人間向けに優しくしたコードをgistに置いた](https://gist.github.com/koturn/2626d9e33d3fc2b0ea2237c5afe6d8a3 "https://gist.github.com/koturn/2626d9e33d3fc2b0ea2237c5afe6d8a3")ので，コードとして参照したい場合はこちらを見ることを推奨する．
 
 シェーダーコードとしては，まず有効・無効を切り替えるためのプロパティとシェーダーキーワードを設けた．
-Additiveに関してはライトマップを使用する静的なオブジェクトに対して使用するものなので，レイマーチングシェーダーでの用途はないが，VRC Light Volumesの関数部分だけ他のシェーダーにそのまま転用できるようにしたかったので一応残している．
+Additiveに関してはライトマップを使用する静的なオブジェクトに対して使用するものであるため，レイマーチングシェーダーでの用途はない．
+しかし，VRC Light Volumesの関数部分だけ他のシェーダーにそのまま転用できるようにしたかったので一応残している．
 
 ```shaderlab
 [KeywordEnum(Off, On, Additive Only)]
@@ -1289,8 +1304,8 @@ _VRCLightVolumesSpecular ("VRC Light Volumes Specular", Int) = 0
 #endif  // defined(_VRCLIGHTVOLUMES_ON) || defined(_VRCLIGHTVOLUMES_ADDITIVE_ONLY) || defined(_VRCLIGHTVOLUMESSPECULAR_ON) || defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
 ```
 
-このマクロを以て必要ファイルのインクルードを行う．
-パッケージマネージャで導入されている前提のパスとしているが，unitypackageで導入されている場合にも対応したい場合は，
+このマクロを用いて必要ファイルのインクルードを行う．
+パッケージマネージャで導入されている前提のパスとしているが，unitypackageで導入されている場合にも対応したい場合は，エディタ拡張等を用いて小細工を行う必要がある．
 
 ```hlsl
 #if defined(USE_VRCLIGHTVOLUMES)
@@ -1404,8 +1419,8 @@ half4 calcLightingUnity(half4 color, float3 worldPos, float3 worldNormal, half a
    どちらを用いるかの判断基準は下記の通り．
     - `"LTCGI" = "変数名"`: LTCGIの処理コードをシェーダーに含め，動的に判定を行いたい場合．
     - `"LTCGI" = "ALWAYS"`: LTCGIの処理コード自体をキーワード指定 (`#pragma shader_feature_local_fragment`) で含めないようにしたい場合．<br>
-    このタグはLTCGIを組み込んだワールドプロジェクトにおけるエディタ (`LTCGI_Controller`) の処理対象であることをマークするためのものであるので，アバターに組み込むシェーダーとしては無くてもよい．<br>
-    しかし，ワールドで用いることが少しでも想定されるのであれば，記載しておく方がよいと思われる．
+      このタグはLTCGIを組み込んだワールドプロジェクトにおけるエディタ (`LTCGI_Controller`) の処理対象であることをマークするためのものであるので，アバターに組み込むシェーダーとしては無くてもよい．<br>
+      しかし，ワールドで用いることが少しでも想定されるのであれば，記載しておく方がよいと思われる．
 
 LTCGIはv1とv2のAPIがあるが，本記事ではv1のAPIを利用する例を示す．
 
@@ -1597,7 +1612,8 @@ half4 tex2DTriPlanar(sampler2D tex, float3 pos, float3 normal, float sharpness)
 ```
 
 `pos`, `normal` は3次元の座標とその座標における法線を意味するが，ワールド空間のものかオブジェクト空間のものを用いるかは一考の余地がある．
-ワールド空間でのレイマーチングであれば，Tri-Planarの入力としてもワールド空間における座標と法線を用いても問題はないが，移動や回転等の変化があるオブジェクト空間でのレイマーチングであればオブジェクト空間の座標と法線を用いる方がよいと思う．
+ワールド空間でのレイマーチングであれば，Tri-Planarの入力としてもワールド空間における座標と法線を用いても問題はない．
+しかし，移動や回転等の変化があるオブジェクト空間でのレイマーチングであれば，オブジェクト空間の座標と法線を用いる方がよいと思う．
 
 | ローカル座標でのTriplanar | ワールド座標でのTriplanar |
 |:-:|:-:|
@@ -2006,7 +2022,7 @@ Unity 2021.2 からは特定のキーワードが有効時にシェーダーモ�
 
 ### Cull FrontのCubeでの出力結果
 
-投影面がQuadで遮蔽されている場合， `SV_DepthLessEqual` が指定されていると先に投影面のZ-Testが行われてしまうため，描画が正常に行われなっている．
+投影面がQuadで遮蔽されている場合， `SV_DepthLessEqual` が指定されていると先に投影面のZ-Testが行われてしまうため，描画が正常に行われなくなっている．
 全面的に描画されなくなるのではなく，部分的に描画が欠ける現象となっている．
 
 | `SV_Depth` | `SV_DepthLessEqual` | `SV_DepthGreaterEqual` |
@@ -2027,6 +2043,7 @@ Unity 2021.2 からは特定のキーワードが有効時にシェーダーモ�
 
 - [VRChatでどうしても レイマーチングをしたいあなたへ贈る本【Ver 1.1】](https://butadiene.booth.pm/items/1829988 "VRChatでどうしても レイマーチングをしたいあなたへ贈る本【Ver 1.1】 - Butadiene Works - BOOTH")
 - [Unity でオブジェクトスペースの Raymarching をフォワードレンダリングでやってみた - 凹みTips](https://tips.hecomi.com/entry/2018/12/31/211448 "Unity でオブジェクトスペースの Raymarching をフォワードレンダリングでやってみた - 凹みTips")
+- [Shader Blocking and Fallback System](https://creators.vrchat.com/avatars/shader-fallback-system/ "Shader Blocking and Fallback System | VRChat Creation")
 - [Inigo Quilez :: computer graphics, mathematics, shaders, fractals, demoscene and more](https://iquilezles.org/articles/normalsSDF/ "Inigo Quilez :: computer graphics, mathematics, shaders, fractals, demoscene and more")
 - [Unity で距離関数の記述だけでレイマーチングができる uRaymarching を Forward / XR 対応した - 凹みTips](https://tips.hecomi.com/entry/2019/01/27/233137 "Unity で距離関数の記述だけでレイマーチングができる uRaymarching を Forward / XR 対応した - 凹みTips")
 - [Unity - Manual: Targeting shader models and GPU features in HLSL](https://docs.unity3d.com/2022.3/Documentation/Manual/SL-ShaderCompileTargets.html "Unity - Manual: Targeting shader models and GPU features in HLSL")
