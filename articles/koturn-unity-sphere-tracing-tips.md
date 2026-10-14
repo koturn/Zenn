@@ -1269,12 +1269,18 @@ _Lighting ("Lighting method", Int) = 2
 
 サンプルコード: [Assets/koturn/SphereTracingTips/04_LightingSpecial/Shaders/VRCLV.shader](https://github.com/koturn/SphereTracingTips/blob/main/Assets/koturn/SphereTracingTips/04_LightingSpecial/Shaders/VRCLV.shader "Assets/koturn/SphereTracingTips/04_LightingSpecial/Shaders/VRCLV.shader")
 
-[VRC Light Volumes](https://github.com/REDSIM/VRCLightVolumes "REDSIM/VRCLightVolumes")に対応するには[公式のドキュメントに記載があるように](https://github.com/REDSIM/VRCLightVolumes/blob/v.2.0.1/Documentation/ForShaderDevelopers.md "REDSIM/VRCLightVolumes Documentation/ForShaderDevelopers.md")，下記の対応を行うとよい．
+[VRC Light Volumes](https://github.com/REDSIM/VRCLightVolumes "REDSIM/VRCLightVolumes")に対応するには[公式のドキュメントに記載があるように](https://github.com/REDSIM/VRCLightVolumes/blob/v.3.0.1/Documentation/ForShaderDevelopers.md "REDSIM/VRCLightVolumes Documentation/ForShaderDevelopers.md")，下記の対応を行うとよい．
 
-1. `LightVolumeSH()` で球面調和関数の係数を計算
-2. `ShaderSH9()` あるいは `ShadeSHPerPixel()` の代わりに `LightVolumeEvaluate()` を用いてdiffuseを計算
-3. `LightVolumeSpecular()` または `LightVolumeSpecularDominant()` を用いてspecularを計算（必須ではない）
-4. 出力カラーにdiffuseとspecularを反映
+- Ver. 3.X
+    1. `LightVolumeSHSpecular()` で球面調和関数の係数とスペキュラを計算．スペキュラが不要であれば， `LightVolumeSH()` で球面調和関数の係数のみを計算
+        - 3.X系では `LightVolumeSH()` がワールド空間の法線を受け取るようになっている．
+    2. `ShaderSH9()` あるいは `ShadeSHPerPixel()` の代わりに `LightVolumeEvaluate()` を用いてdiffuseを計算
+    3. 出力カラーにdiffuseとspecularを反映
+- Ver. 2.X
+    1. `LightVolumeSH()` で球面調和関数の係数を計算
+    2. `ShaderSH9()` あるいは `ShadeSHPerPixel()` の代わりに `LightVolumeEvaluate()` を用いてdiffuseを計算
+    3. `LightVolumeSpecular()` または `LightVolumeSpecularDominant()` を用いてspecularを計算（必須ではない）
+    4. 出力カラーにdiffuseとspecularを反映
 
 公式に[Surfaceシェーダーのサンプルコード](https://github.com/REDSIM/VRCLightVolumes/blob/v.2.0.1/Packages/red.sim.lightvolumes/Shaders/ASE%20Shaders/Light%20Volume%20PBR.shader "REDSIM/VRCLightVolumes Packages/red.sim.lightvolumes/Shaders/ASE Shaders/Light Volume PBR.shader")があるが，[Amplified Shader Editor](https://assetstore.unity.com/packages/tools/visual-scripting/amplify-shader-editor-68570 "Amplify Shader Editor | Visual Scripting | Unity Asset Store")製であるため，人間に優しくないコードとなっている．
 [人間向けに優しくしたコードをgistに置いた](https://gist.github.com/koturn/2626d9e33d3fc2b0ea2237c5afe6d8a3 "https://gist.github.com/koturn/2626d9e33d3fc2b0ea2237c5afe6d8a3")ので，コードとして参照したい場合はこちらを見ることを推奨する．
@@ -1284,7 +1290,7 @@ Additiveに関してはライトマップを使用する静的なオブジェク
 しかし，VRC Light Volumesの関数部分だけ他のシェーダーにそのまま転用できるようにしたかったので一応残している．
 
 ```shaderlab
-[KeywordEnum(Off, On, Additive Only)]
+[KeywordEnum(Off, On)]
 _VRCLightVolumes ("VRC Light Volumes", Int) = 0
 
 [KeywordEnum(Off, On, Dominant Dir)]
@@ -1292,16 +1298,16 @@ _VRCLightVolumesSpecular ("VRC Light Volumes Specular", Int) = 0
 ```
 
 ```hlsl
-#pragma shader_feature_local_fragment _VRCLIGHTVOLUMES_OFF _VRCLIGHTVOLUMES_ON _VRCLIGHTVOLUMES_ADDITIVE_ONLY
+#pragma shader_feature_local_fragment _VRCLIGHTVOLUMES_OFF _VRCLIGHTVOLUMES_ON
 #pragma shader_feature_local_fragment _VRCLIGHTVOLUMESSPECULAR_OFF _VRCLIGHTVOLUMESSPECULAR_ON _VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR
 ```
 
-`LightVolumes.cginc` をインクルードすべきか，VRC Light Volumesの処理を通すべきかを判断するのに4つのマクロのいずれかが有効であることを随所で判定するのは煩雑なので，下記のマクロ `USE_VRCLIGHTVOLUMES` を設けた．
+`LightVolumes.cginc` をインクルードすべきか，VRC Light Volumesの処理を通すべきかを判断するのに3つのマクロのいずれかが有効であることを随所で判定するのは煩雑なので，下記のマクロ `USE_VRCLIGHTVOLUMES` を設けた．
 
 ```hlsl
-#if defined(_VRCLIGHTVOLUMES_ON) || defined(_VRCLIGHTVOLUMES_ADDITIVE_ONLY) || defined(_VRCLIGHTVOLUMESSPECULAR_ON) || defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
+#if defined(_VRCLIGHTVOLUMES_ON) || defined(_VRCLIGHTVOLUMESSPECULAR_ON) || defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
 #    define USE_VRCLIGHTVOLUMES
-#endif  // defined(_VRCLIGHTVOLUMES_ON) || defined(_VRCLIGHTVOLUMES_ADDITIVE_ONLY) || defined(_VRCLIGHTVOLUMESSPECULAR_ON) || defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
+#endif  // defined(_VRCLIGHTVOLUMES_ON) || defined(_VRCLIGHTVOLUMESSPECULAR_ON) || defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
 ```
 
 このマクロを用いて必要ファイルのインクルードを行う．
@@ -1314,9 +1320,119 @@ _VRCLightVolumesSpecular ("VRC Light Volumes Specular", Int) = 0
 ```
 
 `calcLightingCustom()` は下記の通り．
-`ShadeSHPerPixel()` を置き換える形で使用する．
+`ShadeSHPerPixel()` を置き換える形で `calcLightVolumeEmission()` という関数を定義して使用する．
 
 ```hlsl
+#if defined(USE_VRCLIGHTVOLUMES)
+half3 calcLightVolumeEmission(half3 albedo, float3 worldPos, float3 worldNormal, float3 worldViewDir, half glossiness, half metallic)
+{
+    float3 L0, L1r, L1g, L1b;
+
+#    if defined(VRCLV_VERSION) && VRCLV_VERSION >= 3
+#        if defined(_VRCLIGHTVOLUMES_ON)
+#            if defined(_VRCLIGHTVOLUMESSPECULAR_ON) || defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
+#                if defined(LIGHTMAP_ON)
+    float3 specular;
+    LightVolumeAdditiveSHSpecular(
+        worldPos,
+        /* out */ L0,
+        /* out */ L1r,
+        /* out */ L1g,
+        /* out */ L1b,
+        /* out */ specular,
+        albedo,
+        glossiness,
+        metallic,
+        worldNormal,
+        worldViewDir);
+#                else
+    float3 specular;
+    LightVolumeSHSpecular(
+        worldPos,
+        /* out */ L0,
+        /* out */ L1r,
+        /* out */ L1g,
+        /* out */ L1b,
+        /* out */ specular,
+        albedo,
+        glossiness,
+        metallic,
+        worldNormal,
+        worldViewDir);
+#                endif  // defined(LIGHTMAP_ON)
+#            else
+#                if defined(LIGHTMAP_ON)
+    LightVolumeAdditiveSH(
+        worldPos,
+        /* out */ L0,
+        /* out */ L1r,
+        /* out */ L1g,
+        /* out */ L1b,
+        (0.0).xxx,
+        worldNormal);
+#                else
+    LightVolumeSH(
+        worldPos,
+        /* out */ L0,
+        /* out */ L1r,
+        /* out */ L1g,
+        /* out */ L1b,
+        (0.0).xxx,
+        worldNormal);
+#                endif  // defined(LIGHTMAP_ON)
+#            endif  // defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
+#        else
+    L0 = float3(unity_SHAr.w, unity_SHAg.w, unity_SHAb.w);
+    L1r = unity_SHAr.xyz;
+    L1g = unity_SHAg.xyz;
+    L1b = unity_SHAb.xyz;
+#        endif  // defined(_VRCLIGHTVOLUMES_ON)
+
+    const float3 indirect = max(LightVolumeEvaluate(worldNormal, L0, L1r, L1g, L1b), 0.0) * albedo;
+    const half3 emission = indirect - indirect * metallic;
+
+#        if defined(_VRCLIGHTVOLUMES_ON) && (defined(_VRCLIGHTVOLUMESSPECULAR_ON) || defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR))
+    // specular is already calculated.
+#        elif defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
+    const float3 specular = LightVolumeSpecularDominant(albedo, glossiness, metallic, worldNormal, worldViewDir, L0, L1r, L1g, L1b);
+#        elif defined(_VRCLIGHTVOLUMESSPECULAR_ON)
+    const float3 specular = LightVolumeSpecular(albedo, glossiness, metallic, worldNormal, worldViewDir, L0, L1r, L1g, L1b);
+#        else
+    const float3 specular = (0.0).xxx;
+#        endif  // defined(_VRCLIGHTVOLUMES_ON) && defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
+
+    return emission + specular;
+#    else
+#        if defined(_VRCLIGHTVOLUMES_ON)
+#            if defined(LIGHTMAP_ON)
+    LightVolumeAdditiveSH(worldPos, /* out */ L0, /* out */ L1r, /* out */ L1g, /* out */ L1b);
+#            else
+    LightVolumeSH(worldPos, /* out */ L0, /* out */ L1r, /* out */ L1g, /* out */ L1b);
+#            endif  // defined(LIGHTMAP_ON)
+#        else
+    L0 = float3(unity_SHAr.w, unity_SHAg.w, unity_SHAb.w);
+    L1r = unity_SHAr.xyz;
+    L1g = unity_SHAg.xyz;
+    L1b = unity_SHAb.xyz;
+#        endif  // defined(_VRCLIGHTVOLUMES_ON)
+
+    const float3 indirect = LightVolumeEvaluate(worldNormal, L0, L1r, L1g, L1b) * albedo;
+    half3 emission = indirect - indirect * metallic;
+
+#        if defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
+    const float3 specular = LightVolumeSpecularDominant(albedo, glossiness, metallic, worldNormal, worldViewDir, L0, L1r, L1g, L1b);
+#        elif defined(_VRCLIGHTVOLUMESSPECULAR_ON)
+    const float3 specular = LightVolumeSpecular(albedo, glossiness, metallic, worldNormal, worldViewDir, L0, L1r, L1g, L1b);
+#        else
+    const float3 specular = (0.0).xxx;
+#        endif  // defined(_VRCLIGHTVOLUMESSPECULAR_DOMINANT_DIR)
+
+    return emission + specular;
+#    endif  // defined(VRCLV_VERSION) && VRCLV_VERSION >= 3
+}
+#endif  // defined(USE_VRCLIGHTVOLUMES)
+
+
 half4 calcLightingCustom(half4 color, float3 worldPos, float3 worldNormal, half atten, half3 ambient)
 {
     const float3 worldViewDir = normalize(_WorldSpaceCameraPos - worldPos);
@@ -1349,6 +1465,13 @@ half4 calcLightingCustom(half4 color, float3 worldPos, float3 worldNormal, half 
     return outColor;
 }
 ```
+
+VRC Light Volumes 2.X系と3.X系を両方ともサポートする形としたため，ごちゃごちゃしたように見えるが，処理としてはそこまで複雑ではない．
+また，3.X系では `LightVolumeSpecular()` に対応する関数（複数スペキュラに対応した関数）が新規提供されていないため，2.X系での切り替えは無くしてよいかもしれない．
+
+:::message
+ビルド環境（アバター側）が3.X系で，ワールドに導入されているのが2.X系であってもうまく動作する
+:::
 
 `calcLightingUnity()` は下記の通り．
 `LightingXXX_GI()` と `LightingXXX()` の間にVRC Light Volumesの処理を入れる．
@@ -2057,6 +2180,8 @@ Unity 2021.2 からは特定のキーワードが有効時にシェーダーモ�
 - [lilxyzw/Shader-MEMO Assets/SPSITest.shader](https://github.com/lilxyzw/Shader-MEMO/blob/main/Assets/SPSITest.shader "Shader-MEMO/Assets/SPSITest.shader at main · lilxyzw/Shader-MEMO")
 - [pema99/shader-knowledge raymarching.md ](https://github.com/pema99/shader-knowledge/blob/main/raymarching.md "shader-knowledge/raymarching.md at main · pema99/shader-knowledge")
 - [REDSIM/VRCLightVolumes](https://github.com/REDSIM/VRCLightVolumes "REDSIM/VRCLightVolumes: Nextgen voxel based light probes replacement for VRChat")
+    - [VRCLightVolumes/Documentation/ForShaderDevelopers.md at v.2.0.1 · REDSIM/VRCLightVolumes](https://github.com/REDSIM/VRCLightVolumes/blob/v.2.1.3/Documentation/ForShaderDevelopers.md "VRCLightVolumes/Documentation/ForShaderDevelopers.md at v.2.0.1 · REDSIM/VRCLightVolumes")
+    - [VRCLightVolumes/Documentation/ForShaderDevelopers.md at v.3.0.1 · REDSIM/VRCLightVolumes](https://github.com/REDSIM/VRCLightVolumes/blob/v.3.0.1/Documentation/ForShaderDevelopers.md "VRCLightVolumes/Documentation/ForShaderDevelopers.md at v.3.0.1 · REDSIM/VRCLightVolumes")
 - [PiMaker/ltcgi](https://github.com/PiMaker/ltcgi "PiMaker/ltcgi: Optimized plug-and-play realtime area lighting using the linearly transformed cosine algorithm for Unity/VRChat.")
 - [Amplified Shader Editor](https://assetstore.unity.com/packages/tools/visual-scripting/amplify-shader-editor-68570 "Amplify Shader Editor | Visual Scripting | Unity Asset Store")
 - [koturn/2626d9e33d3fc2b0ea2237c5afe6d8a3](https://gist.github.com/koturn/2626d9e33d3fc2b0ea2237c5afe6d8a3 "https://gist.github.com/koturn/2626d9e33d3fc2b0ea2237c5afe6d8a3")
